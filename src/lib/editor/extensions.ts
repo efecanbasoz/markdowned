@@ -12,9 +12,11 @@ import { languages } from "@codemirror/language-data";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
 import { crispModernTheme, crispModernHighlight } from "./theme";
 import { markdownKeybindings } from "./keybindings";
+import { ghostTextExtension } from "./ghost-text";
 
 export function createExtensions(
-  onUpdate: (content: string, line: number, col: number) => void
+  onUpdate: (content: string, line: number, col: number) => void,
+  onTriggerCompletion?: (view: EditorView) => void
 ) {
   return [
     crispModernTheme,
@@ -28,7 +30,22 @@ export function createExtensions(
     indentOnInput(),
     markdown({ codeLanguages: languages }),
     markdownKeybindings,
-    keymap.of([...defaultKeymap, ...historyKeymap]),
+    ghostTextExtension,
+    keymap.of([
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...(onTriggerCompletion
+        ? [
+            {
+              key: "Mod-Enter",
+              run: (view: EditorView) => {
+                onTriggerCompletion(view);
+                return true;
+              },
+            },
+          ]
+        : []),
+    ]),
     EditorView.updateListener.of((update) => {
       if (update.docChanged || update.selectionSet) {
         const content = update.state.doc.toString();

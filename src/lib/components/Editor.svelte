@@ -4,6 +4,11 @@
   import { EditorState } from "@codemirror/state";
   import { createExtensions } from "$lib/editor/extensions";
   import { editor as editorStore } from "$lib/stores/editor.svelte";
+  import {
+    appendGhostText,
+    clearGhostText,
+  } from "$lib/editor/ghost-text";
+  import { requestCompletion } from "$lib/commands/completion";
 
   let container: HTMLDivElement;
   let view: EditorView | null = null;
@@ -19,6 +24,8 @@
     return view;
   }
 
+  let cleanupCompletion: (() => void) | null = null;
+
   function handleUpdate(content: string, line: number, col: number) {
     editorStore.line = line;
     editorStore.column = col;
@@ -26,13 +33,39 @@
     editorStore.content = content;
   }
 
+  function triggerCompletion(editorView: EditorView) {
+    // Cancel any in-flight completion
+    cleanupCompletion?.();
+    cleanupCompletion = null;
+
+    // Get document content up to cursor position
+    const cursor = editorView.state.selection.main.head;
+    const context = editorView.state.sliceDoc(0, cursor);
+
+    // Clear any existing ghost text
+    editorView.dispatch({ effects: clearGhostText.of(undefined) });
+
+    requestCompletion(
+      context,
+      (chunk) => {
+        editorView.dispatch({ effects: appendGhostText.of(chunk) });
+      },
+      () => {
+        cleanupCompletion = null;
+      }
+    ).then((cleanup) => {
+      cleanupCompletion = cleanup;
+    });
+  }
+
   onMount(() => {
     const state = EditorState.create({
       doc: editorStore.content,
-      extensions: createExtensions(handleUpdate),
+      extensions: createExtensions(handleUpdate, triggerCompletion),
     });
     view = new EditorView({ state, parent: container });
     return () => {
+      cleanupCompletion?.();
       view?.destroy();
       view = null;
     };
