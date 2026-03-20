@@ -23,6 +23,8 @@ pub fn run() {
             commands::workspace::scan_directory,
             commands::workspace::watch_workspace,
             commands::preview::render_preview,
+            commands::config::load_config,
+            commands::config::save_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
