@@ -1,5 +1,12 @@
 <script lang="ts">
   import { workspace } from "$lib/stores/workspace.svelte";
+  import FileTree from "./FileTree.svelte";
+
+  const rootName = $derived(
+    workspace.workspaceRoot
+      ? workspace.workspaceRoot.split("/").pop() ?? "Workspace"
+      : null
+  );
 </script>
 
 <aside class="sidebar">
@@ -7,7 +14,12 @@
     <span class="label">EXPLORER</span>
   </header>
   <div class="sidebar-content">
-    <p class="placeholder-text">Open a workspace to begin</p>
+    {#if rootName}
+      <div class="workspace-root">{rootName}</div>
+      <FileTree entries={workspace.entries} />
+    {:else}
+      <p class="placeholder-text">Open a workspace to begin</p>
+    {/if}
   </div>
   <footer class="sidebar-footer">
     <span class="file-count">{workspace.fileCount} files</span>
@@ -42,6 +54,15 @@
     flex: 1;
     overflow-y: auto;
     padding: 12px;
+  }
+
+  .workspace-root {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 0 0 6px;
+    text-transform: uppercase;
   }
 
   .placeholder-text {
