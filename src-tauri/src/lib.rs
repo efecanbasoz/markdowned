@@ -1,5 +1,5 @@
 pub mod commands;
-mod models;
+pub mod models;
 pub mod services;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -25,6 +25,7 @@ pub fn run() {
             commands::preview::render_preview,
             commands::config::load_config,
             commands::config::save_config,
+            commands::completion::request_completion,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
