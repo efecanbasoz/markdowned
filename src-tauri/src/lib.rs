@@ -1,5 +1,6 @@
 pub mod commands;
 mod models;
+pub mod services;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -19,6 +20,7 @@ pub fn run() {
             commands::file::delete_file,
             commands::file::rename_file,
             commands::workspace::scan_directory,
+            commands::preview::render_preview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
