@@ -21,6 +21,7 @@ pub fn run() {
             commands::file::delete_file,
             commands::file::rename_file,
             commands::workspace::scan_directory,
+            commands::workspace::watch_workspace,
             commands::preview::render_preview,
         ])
         .run(tauri::generate_context!())

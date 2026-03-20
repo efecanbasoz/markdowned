@@ -10,6 +10,8 @@
   import { scanDirectory } from "$lib/commands/workspace";
   import { renderPreview } from "$lib/commands/preview";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { listen } from "@tauri-apps/api/event";
+  import { invoke } from "@tauri-apps/api/core";
 
   let editorComponent: Editor;
   let previewTimeout: ReturnType<typeof setTimeout>;
@@ -59,6 +61,23 @@
       console.error("Save failed:", e);
     }
   }
+
+  // Start filesystem watcher when workspace opens
+  $effect(() => {
+    const root = workspace.workspaceRoot;
+    if (!root) return;
+
+    let unlisten: (() => void) | undefined;
+
+    (async () => {
+      await invoke("watch_workspace", { path: root });
+      unlisten = await listen("file-changed", async () => {
+        workspace.entries = await scanDirectory(root);
+      });
+    })();
+
+    return () => unlisten?.();
+  });
 
   // Watch for active file changes
   $effect(() => {

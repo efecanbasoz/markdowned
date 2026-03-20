@@ -1,4 +1,5 @@
 use crate::models::workspace::{FileEntry, FileType};
+use crate::services::watcher;
 use ignore::WalkBuilder;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -79,4 +80,9 @@ pub fn scan_directory_impl(path: &str) -> Result<Vec<FileEntry>, String> {
 #[tauri::command]
 pub async fn scan_directory(path: String) -> Result<Vec<FileEntry>, String> {
     scan_directory_impl(&path)
+}
+
+#[tauri::command]
+pub async fn watch_workspace(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    watcher::start_watcher(app, path)
 }
