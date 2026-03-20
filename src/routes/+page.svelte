@@ -9,6 +9,7 @@
   import { openFile, saveFile } from "$lib/commands/file";
   import { scanDirectory } from "$lib/commands/workspace";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
+  import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import { renderPreview } from "$lib/commands/preview";
   import { open } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
@@ -16,6 +17,7 @@
 
   let editorComponent: Editor;
   let showPalette = $state(false);
+  let showSettings = $state(false);
   let previewTimeout: ReturnType<typeof setTimeout>;
 
   async function handleOpenWorkspace() {
@@ -104,6 +106,7 @@
       editor.activeTab = editor.activeTab === "edit" ? "preview" : "edit";
     }
     if (mod && e.key === "k") { e.preventDefault(); showPalette = !showPalette; }
+    if (mod && e.key === ",") { e.preventDefault(); showSettings = !showSettings; }
     if (mod && e.shiftKey && (e.key === "E" || e.key === "e")) {
       e.preventDefault();
       workspace.sidebarVisible = !workspace.sidebarVisible;
@@ -143,6 +146,7 @@
 </div>
 
 <CommandPalette bind:visible={showPalette} onSelect={(path) => (workspace.activeFilePath = path)} />
+<SettingsDialog bind:visible={showSettings} />
 
 <style>
   .app-layout { display: flex; height: 100vh; width: 100%; }
