@@ -10,3 +10,7 @@ target/
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Codex scan results
+security-scan-results.md
+quality-scan-results.md

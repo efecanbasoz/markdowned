@@ -54,7 +54,10 @@
   function handleUpdate(content: string, line: number, col: number, docChanged: boolean) {
     const cursorPos = view?.state.selection.main.head ?? 0;
     editorStore.updateActiveCursor(line, col, cursorPos);
-    editorStore.updateActiveContent(content);
+    // QA-001: Only persist content on real document edits to avoid false dirty state
+    if (docChanged) {
+      editorStore.updateActiveContent(content);
+    }
 
     // Auto-completion: debounce on typing pause
     if (autoCompletionEnabled && docChanged && view) {
