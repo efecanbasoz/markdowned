@@ -52,7 +52,7 @@ pub async fn open_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<String, String> {
-    let root = state.root.lock().unwrap().clone();
+    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
     validate_within_workspace(&path, &root)?;
     tokio::task::spawn_blocking(move || open_file_impl(&path))
         .await
@@ -65,7 +65,7 @@ pub async fn save_file(
     path: String,
     content: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().unwrap().clone();
+    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
     validate_within_workspace(&path, &root)?;
     tokio::task::spawn_blocking(move || save_file_impl(&path, &content))
         .await
@@ -77,7 +77,7 @@ pub async fn create_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().unwrap().clone();
+    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
     validate_within_workspace(&path, &root)?;
     tokio::task::spawn_blocking(move || create_file_impl(&path))
         .await
@@ -89,7 +89,7 @@ pub async fn delete_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().unwrap().clone();
+    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
     validate_within_workspace(&path, &root)?;
     tokio::task::spawn_blocking(move || delete_file_impl(&path))
         .await
@@ -102,7 +102,7 @@ pub async fn rename_file(
     old_path: String,
     new_path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().unwrap().clone();
+    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
     validate_within_workspace(&old_path, &root)?;
     validate_within_workspace(&new_path, &root)?;
     tokio::task::spawn_blocking(move || rename_file_impl(&old_path, &new_path))

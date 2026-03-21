@@ -125,7 +125,19 @@ pub async fn stream_completion(
         );
     }
 
-    let client = reqwest::Client::new();
+    // SEC-005: Validate URL scheme for non-loopback hosts
+    if let Ok(parsed_url) = reqwest::Url::parse(&url) {
+        let is_loopback = parsed_url.host_str().map_or(false, |h| h == "localhost" || h == "127.0.0.1" || h == "::1");
+        if !is_loopback && parsed_url.scheme() != "https" {
+            return Err("Non-loopback LLM endpoints must use HTTPS".to_string());
+        }
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
     let response = client
         .post(&url)
         .headers(headers)
