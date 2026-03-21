@@ -1,15 +1,13 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// SEC-001: Validate path is within workspace and return the CANONICAL path.
 /// All I/O must use the returned canonical path to prevent TOCTOU races
 /// where a symlink is swapped between validation and file operation.
-pub fn resolve_safe_path(path: &str, workspace_root: &Option<String>) -> Result<String, String> {
-    let root = workspace_root.as_ref()
-        .ok_or_else(|| "No workspace open".to_string())?;
-
-    let canonical_root = fs::canonicalize(root)
-        .map_err(|e| format!("Invalid workspace root: {e}"))?;
+pub fn resolve_safe_path(path: &str, workspace_roots: &[String]) -> Result<String, String> {
+    if workspace_roots.is_empty() {
+        return Err("No workspace open".to_string());
+    }
 
     // For new files, canonicalize parent directory + filename
     let canonical_path = fs::canonicalize(path)
@@ -21,7 +19,14 @@ pub fn resolve_safe_path(path: &str, workspace_root: &Option<String>) -> Result<
         })
         .map_err(|e| format!("Invalid path: {e}"))?;
 
-    if !canonical_path.starts_with(&canonical_root) {
+    // Check if path falls within any workspace root
+    let in_workspace = workspace_roots.iter().any(|root| {
+        fs::canonicalize(root)
+            .map(|canonical_root| canonical_path.starts_with(&canonical_root))
+            .unwrap_or(false)
+    });
+
+    if !in_workspace {
         return Err("Path is outside workspace boundary".to_string());
     }
 
@@ -67,8 +72,8 @@ pub async fn open_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<String, String> {
-    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
-    let safe_path = resolve_safe_path(&path, &root)?;
+    let roots = state.roots.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
+    let safe_path = resolve_safe_path(&path, &roots)?;
     tokio::task::spawn_blocking(move || open_file_impl(&safe_path))
         .await
         .map_err(|e| format!("Task failed: {e}"))?
@@ -80,8 +85,8 @@ pub async fn save_file(
     path: String,
     content: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
-    let safe_path = resolve_safe_path(&path, &root)?;
+    let roots = state.roots.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
+    let safe_path = resolve_safe_path(&path, &roots)?;
     tokio::task::spawn_blocking(move || save_file_impl(&safe_path, &content))
         .await
         .map_err(|e| format!("Task failed: {e}"))?
@@ -92,8 +97,8 @@ pub async fn create_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
-    let safe_path = resolve_safe_path(&path, &root)?;
+    let roots = state.roots.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
+    let safe_path = resolve_safe_path(&path, &roots)?;
     tokio::task::spawn_blocking(move || create_file_impl(&safe_path))
         .await
         .map_err(|e| format!("Task failed: {e}"))?
@@ -104,8 +109,8 @@ pub async fn delete_file(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
-    let safe_path = resolve_safe_path(&path, &root)?;
+    let roots = state.roots.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
+    let safe_path = resolve_safe_path(&path, &roots)?;
     tokio::task::spawn_blocking(move || delete_file_impl(&safe_path))
         .await
         .map_err(|e| format!("Task failed: {e}"))?
@@ -117,9 +122,9 @@ pub async fn rename_file(
     old_path: String,
     new_path: String,
 ) -> Result<(), String> {
-    let root = state.root.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
-    let safe_old = resolve_safe_path(&old_path, &root)?;
-    let safe_new = resolve_safe_path(&new_path, &root)?;
+    let roots = state.roots.lock().map_err(|e| format!("Workspace state error: {e}"))?.clone();
+    let safe_old = resolve_safe_path(&old_path, &roots)?;
+    let safe_new = resolve_safe_path(&new_path, &roots)?;
     tokio::task::spawn_blocking(move || rename_file_impl(&safe_old, &safe_new))
         .await
         .map_err(|e| format!("Task failed: {e}"))?

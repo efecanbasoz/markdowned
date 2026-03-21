@@ -5,12 +5,12 @@ pub mod services;
 use std::sync::{Arc, Mutex};
 
 pub struct WorkspaceState {
-    pub root: Arc<Mutex<Option<String>>>,
+    pub roots: Arc<Mutex<Vec<String>>>,
 }
 
 impl Default for WorkspaceState {
     fn default() -> Self {
-        Self { root: Arc::new(Mutex::new(None)) }
+        Self { roots: Arc::new(Mutex::new(Vec::new())) }
     }
 }
 
@@ -30,6 +30,7 @@ pub fn run() {
             commands::workspace::scan_directory,
             commands::workspace::watch_workspace,
             commands::workspace::search_workspace,
+            commands::workspace::unwatch_workspace,
             commands::preview::render_preview,
             commands::config::load_config,
             commands::config::save_config,

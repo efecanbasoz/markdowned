@@ -97,10 +97,12 @@ pub async fn scan_directory(
         return Err("Workspace path is too broad. Choose a more specific directory.".to_string());
     }
 
-    // Set workspace root before spawn_blocking
+    // Add to workspace roots before spawn_blocking
     {
-        let mut root = state.root.lock().map_err(|e| format!("State error: {e}"))?;
-        *root = Some(canonical_str.clone());
+        let mut roots = state.roots.lock().map_err(|e| format!("State error: {e}"))?;
+        if !roots.contains(&canonical_str) {
+            roots.push(canonical_str.clone());
+        }
     }
     tokio::task::spawn_blocking(move || scan_directory_impl(&canonical_str))
         .await
@@ -222,13 +224,49 @@ pub async fn search_workspace(
     state: tauri::State<'_, crate::WorkspaceState>,
     query: String,
 ) -> Result<Vec<SearchMatch>, String> {
-    let root = state
-        .root
+    let roots = state
+        .roots
         .lock()
         .map_err(|e| format!("State error: {e}"))?
-        .clone()
-        .ok_or_else(|| "No workspace open".to_string())?;
-    tokio::task::spawn_blocking(move || search_workspace_impl(&root, &query))
-        .await
-        .map_err(|e| format!("Task failed: {e}"))?
+        .clone();
+    if roots.is_empty() {
+        return Err("No workspace open".to_string());
+    }
+    tokio::task::spawn_blocking(move || {
+        let mut all_results = Vec::new();
+        for root in &roots {
+            match search_workspace_impl(root, &query) {
+                Ok(mut results) => {
+                    all_results.append(&mut results);
+                    if all_results.len() >= MAX_SEARCH_RESULTS {
+                        all_results.truncate(MAX_SEARCH_RESULTS);
+                        break;
+                    }
+                }
+                Err(_) => continue,
+            }
+        }
+        Ok(all_results)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn unwatch_workspace(
+    state: tauri::State<'_, crate::WorkspaceState>,
+    watcher_state: tauri::State<'_, watcher::WatcherState>,
+    path: String,
+) -> Result<(), String> {
+    // Remove from workspace roots
+    let canonical = std::fs::canonicalize(&path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(&path))
+        .to_string_lossy()
+        .to_string();
+    {
+        let mut roots = state.roots.lock().map_err(|e| format!("State error: {e}"))?;
+        roots.retain(|r| r != &canonical);
+    }
+    // Stop watcher
+    watcher::stop_watcher(path, &watcher_state)
 }
