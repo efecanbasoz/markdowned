@@ -36,7 +36,7 @@
         lastWorkspace = config.lastWorkspace;
         splitDirection = config.splitDirection ?? "horizontal";
         autoCompletion = config.completion.autoCompletion ?? false;
-        selectedTheme = (config.theme as "dark" | "light") ?? "dark";
+        selectedTheme = config.theme === "light" ? "light" : "dark";
       });
     }
   });

@@ -32,9 +32,10 @@
 
   async function handleOpenWorkspace() {
     const selected = await open({ directory: true });
-    if (selected) {
-      workspace.workspaceRoot = selected as string;
-      workspace.entries = await scanDirectory(selected as string);
+    // QA-010: Runtime guard instead of unsafe cast
+    if (typeof selected === "string") {
+      workspace.workspaceRoot = selected;
+      workspace.entries = await scanDirectory(selected);
     }
   }
 
@@ -92,7 +93,7 @@
   // Load saved theme on startup
   onMount(() => {
     loadConfig().then((config) => {
-      const savedTheme = (config.theme as "dark" | "light") ?? "dark";
+      const savedTheme = config.theme === "light" ? "light" : "dark";
       editor.theme = savedTheme;
       document.documentElement.setAttribute("data-theme", savedTheme);
     });
