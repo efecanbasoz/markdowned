@@ -8,8 +8,14 @@ pub struct PreviewResult {
     pub frontmatter: Option<String>,
 }
 
+/// QA-006: Offload CPU-heavy rendering to a blocking thread to avoid
+/// starving the async runtime during typing.
 #[tauri::command]
 pub async fn render_preview(content: String) -> Result<PreviewResult, String> {
-    let (frontmatter, html) = renderer::render_markdown_with_frontmatter(&content);
-    Ok(PreviewResult { html, frontmatter })
+    tokio::task::spawn_blocking(move || {
+        let (frontmatter, html) = renderer::render_markdown_with_frontmatter(&content);
+        PreviewResult { html, frontmatter }
+    })
+    .await
+    .map_err(|e| format!("Preview task failed: {e}"))
 }
