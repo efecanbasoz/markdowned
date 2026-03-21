@@ -13,6 +13,7 @@
   let searching = $state(false);
   let inputEl: HTMLInputElement;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchRun = 0;
 
   function close() {
     visible = false;
@@ -67,14 +68,17 @@
     }
 
     searching = true;
+    // QA-012: Use sequence token to prevent stale search results from overwriting newer ones
+    const run = ++searchRun;
     debounceTimer = setTimeout(async () => {
       try {
-        results = await searchWorkspace(q);
+        const found = await searchWorkspace(q);
+        if (run === searchRun) results = found;
       } catch (e) {
         console.error("Search failed:", e);
-        results = [];
+        if (run === searchRun) results = [];
       } finally {
-        searching = false;
+        if (run === searchRun) searching = false;
       }
     }, 300);
   });
