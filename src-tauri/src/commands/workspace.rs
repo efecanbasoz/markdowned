@@ -124,6 +124,31 @@ fn is_binary(data: &[u8]) -> bool {
     data[..check_len].contains(&0)
 }
 
+/// QA-007: Case-insensitive search that returns byte offset in the original string.
+/// This avoids Unicode case-folding length mismatches from to_lowercase().
+fn find_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    let needle_lower = needle.to_lowercase();
+    let needle_chars: Vec<char> = needle_lower.chars().collect();
+    if needle_chars.is_empty() { return None; }
+
+    for (byte_pos, _) in haystack.char_indices() {
+        let candidate: String = haystack[byte_pos..].chars().take(needle_chars.len()).collect();
+        if candidate.to_lowercase() == needle_lower {
+            return Some(byte_pos);
+        }
+    }
+    None
+}
+
+/// Return the byte length of the matched region in the original string.
+fn find_match_len(haystack: &str, start: usize, needle: &str) -> usize {
+    let query_char_count = needle.chars().count();
+    haystack[start..].char_indices()
+        .nth(query_char_count)
+        .map(|(offset, _)| offset)
+        .unwrap_or(haystack.len() - start)
+}
+
 pub fn search_workspace_impl(workspace_root: &str, query: &str) -> Result<Vec<SearchMatch>, String> {
     if query.is_empty() {
         return Ok(Vec::new());
@@ -134,7 +159,6 @@ pub fn search_workspace_impl(workspace_root: &str, query: &str) -> Result<Vec<Se
         return Err(format!("Not a directory: {workspace_root}"));
     }
 
-    let query_lower = query.to_lowercase();
     let walker = WalkBuilder::new(root)
         .hidden(true)
         .git_ignore(true)
@@ -171,15 +195,16 @@ pub fn search_workspace_impl(workspace_root: &str, query: &str) -> Result<Vec<Se
         let file_path = entry_path.to_string_lossy().to_string();
 
         for (line_idx, line) in text.lines().enumerate() {
-            let line_lower = line.to_lowercase();
-            if let Some(pos) = line_lower.find(&query_lower) {
+            // QA-007: Use byte-offset-safe case-insensitive search on the original line
+            // to avoid Unicode case-folding length mismatches between lowered and original strings
+            if let Some(pos) = find_case_insensitive(line, query) {
                 results.push(SearchMatch {
                     file_path: file_path.clone(),
                     file_name: file_name.clone(),
                     line_number: line_idx + 1,
                     line_content: line.to_string(),
                     match_start: pos,
-                    match_end: pos + query.len(),
+                    match_end: pos + find_match_len(line, pos, query),
                 });
 
                 if results.len() >= MAX_SEARCH_RESULTS {
