@@ -8,3 +8,7 @@ export async function scanDirectory(path: string): Promise<FileEntry[]> {
 export async function searchWorkspace(query: string): Promise<SearchMatch[]> {
   return invoke<SearchMatch[]>("search_workspace", { query });
 }
+
+export async function unwatchWorkspace(path: string): Promise<void> {
+  return invoke<void>("unwatch_workspace", { path });
+}

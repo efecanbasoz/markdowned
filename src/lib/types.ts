@@ -36,6 +36,13 @@ export interface SearchMatch {
   matchEnd: number;
 }
 
+export interface WorkspaceEntry {
+  root: string;
+  name: string;
+  entries: FileEntry[];
+  collapsed: boolean;
+}
+
 export type ViewMode = "edit" | "preview" | "split";
 export type SplitDirection = "horizontal" | "vertical";
 
@@ -55,7 +62,7 @@ export interface CompletionConfig {
 
 export interface AppConfig {
   completion: CompletionConfig;
-  lastWorkspace: string | null;
+  workspaces?: string[];
   splitDirection?: SplitDirection;
   theme?: "dark" | "light";
 }
