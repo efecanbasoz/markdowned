@@ -8,11 +8,11 @@
 
 | Severity | Count | Fixed |
 |----------|-------|-------|
-| HIGH | 7 | 6 |
-| MEDIUM | 9 | 7 |
+| HIGH | 7 | 7 |
+| MEDIUM | 9 | 8 |
 | LOW | 1 | 0 |
 | INFO | 3 | 0 |
-| **Total** | **20** | **13** |
+| **Total** | **20** | **15** |
 
 ## Fixed (Round 1)
 
@@ -31,11 +31,17 @@
 - **SEC-007 (MEDIUM)**: Style attributes filtered to safe CSS properties only (color, background, font)
 - All remaining Mutex::lock().unwrap() calls converted to proper Result handling
 
-## Remaining (require deeper refactoring)
+## Fixed (Round 3 — Final)
 
-- **SEC-001 (HIGH)**: TOCTOU race in validate_within_workspace — needs capability-based file access (cap_std crate)
-- **QA-002 (HIGH)**: Completion streaming not request-correlated — needs requestId in both Rust and Svelte
-- **QA-006-015**: Performance (sync I/O), type safety, testing gaps
+- **SEC-001 (HIGH)**: TOCTOU race eliminated — resolve_safe_path() returns canonical path
+  and all I/O uses it. Symlinks explicitly rejected. Original user path never used for I/O.
+- **QA-002 (HIGH)**: Completion streaming now uses requestId — frontend filters chunks by
+  matching request_id, preventing stale request data from leaking into new completions.
+- **QA-006 (MEDIUM)**: Preview rendering offloaded to spawn_blocking to avoid blocking async runtime.
+
+## Remaining (type safety, testing)
+
+- **QA-007-015**: Type safety improvements, Unicode search offsets, testing gaps
 
 ## Positive Findings
 
