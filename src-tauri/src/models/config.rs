@@ -113,7 +113,16 @@ impl AppConfig {
     pub fn load() -> Self {
         let path = Self::config_path();
         match std::fs::read_to_string(&path) {
-            Ok(content) => toml::from_str(&content).unwrap_or_default(),
+            Ok(content) => {
+                // QA-004: Log parse errors instead of silently falling back to defaults
+                match toml::from_str(&content) {
+                    Ok(config) => config,
+                    Err(e) => {
+                        eprintln!("Warning: config parse error at {}: {e}. Using defaults.", path.display());
+                        Self::default()
+                    }
+                }
+            }
             Err(_) => Self::default(),
         }
     }

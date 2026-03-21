@@ -82,12 +82,27 @@ pub async fn scan_directory(
     state: tauri::State<'_, crate::WorkspaceState>,
     path: String,
 ) -> Result<Vec<FileEntry>, String> {
-    // Set workspace root before spawn_blocking (state access must be on the async side)
-    {
-        let mut root = state.root.lock().unwrap();
-        *root = Some(path.clone());
+    // SEC-004: Validate workspace path before accepting it
+    let canonical = std::fs::canonicalize(&path)
+        .map_err(|e| format!("Invalid workspace path: {e}"))?;
+    let canonical_str = canonical.to_string_lossy().to_string();
+
+    // Reject filesystem root as workspace
+    if canonical_str == "/" || canonical_str == "\\" {
+        return Err("Cannot use filesystem root as workspace".to_string());
     }
-    tokio::task::spawn_blocking(move || scan_directory_impl(&path))
+
+    // Reject paths with too few components (e.g., /home or /Users)
+    if canonical.components().count() < 3 {
+        return Err("Workspace path is too broad. Choose a more specific directory.".to_string());
+    }
+
+    // Set workspace root before spawn_blocking
+    {
+        let mut root = state.root.lock().map_err(|e| format!("State error: {e}"))?;
+        *root = Some(canonical_str.clone());
+    }
+    tokio::task::spawn_blocking(move || scan_directory_impl(&canonical_str))
         .await
         .map_err(|e| format!("Task failed: {e}"))?
 }
@@ -185,7 +200,7 @@ pub async fn search_workspace(
     let root = state
         .root
         .lock()
-        .unwrap()
+        .map_err(|e| format!("State error: {e}"))?
         .clone()
         .ok_or_else(|| "No workspace open".to_string())?;
     tokio::task::spawn_blocking(move || search_workspace_impl(&root, &query))
