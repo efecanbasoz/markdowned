@@ -1,4 +1,5 @@
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -9,6 +10,7 @@ use tauri::{AppHandle, Emitter};
 pub struct FileChangeEvent {
     pub kind: String,
     pub path: String,
+    pub workspace_root: String,
 }
 
 struct WatcherHandle {
@@ -16,20 +18,25 @@ struct WatcherHandle {
 }
 
 pub struct WatcherState {
-    handle: Mutex<Option<WatcherHandle>>,
+    handles: Mutex<HashMap<String, WatcherHandle>>,
 }
 
 impl Default for WatcherState {
     fn default() -> Self {
-        Self { handle: Mutex::new(None) }
+        Self { handles: Mutex::new(HashMap::new()) }
     }
 }
 
 pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &WatcherState) -> Result<(), String> {
-    // Drop the previous watcher before creating a new one
+    let canonical = std::fs::canonicalize(&workspace_path)
+        .map_err(|e| format!("Invalid path: {e}"))?
+        .to_string_lossy()
+        .to_string();
+
+    // Remove existing watcher for this path if any
     {
-        let mut guard = watcher_state.handle.lock().map_err(|e| format!("Watcher state error: {e}"))?;
-        *guard = None;
+        let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+        guard.remove(&canonical);
     }
 
     let (tx, rx) = mpsc::channel();
@@ -38,19 +45,17 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
         .map_err(|e| format!("Failed to create watcher: {e}"))?;
 
     watcher
-        .watch(Path::new(&workspace_path), RecursiveMode::Recursive)
+        .watch(Path::new(&canonical), RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to watch directory: {e}"))?;
 
-    // Store the watcher handle to keep it alive and allow cleanup
     {
-        let mut guard = watcher_state.handle.lock().map_err(|e| format!("Watcher state error: {e}"))?;
-        *guard = Some(WatcherHandle { _watcher: watcher });
+        let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+        guard.insert(canonical.clone(), WatcherHandle { _watcher: watcher });
     }
 
-    // SEC-006: Debounce watcher events to prevent CPU spikes from rapid file changes
+    let ws_root = canonical;
     std::thread::spawn(move || {
         use std::time::{Duration, Instant};
-
         let debounce_ms = Duration::from_millis(200);
         let mut last_emit = Instant::now().checked_sub(debounce_ms).unwrap_or_else(Instant::now);
 
@@ -75,6 +80,7 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
                         FileChangeEvent {
                             kind: kind_str.to_string(),
                             path: path.to_string_lossy().to_string(),
+                            workspace_root: ws_root.clone(),
                         },
                     );
                 }
@@ -82,5 +88,15 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
         }
     });
 
+    Ok(())
+}
+
+pub fn stop_watcher(workspace_path: String, watcher_state: &WatcherState) -> Result<(), String> {
+    let canonical = std::fs::canonicalize(&workspace_path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(&workspace_path))
+        .to_string_lossy()
+        .to_string();
+    let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+    guard.remove(&canonical);
     Ok(())
 }
