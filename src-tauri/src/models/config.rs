@@ -49,6 +49,8 @@ pub struct AppConfig {
     pub completion: CompletionConfig,
     #[serde(default)]
     pub last_workspace: Option<String>,
+    #[serde(default)]
+    pub workspaces: Vec<String>,
     #[serde(default = "default_split_direction")]
     pub split_direction: String,
     #[serde(default = "default_theme")]
@@ -95,6 +97,7 @@ impl Default for AppConfig {
         Self {
             completion: CompletionConfig::default(),
             last_workspace: None,
+            workspaces: Vec::new(),
             split_direction: default_split_direction(),
             theme: default_theme(),
         }
@@ -115,8 +118,18 @@ impl AppConfig {
         match std::fs::read_to_string(&path) {
             Ok(content) => {
                 // QA-004: Log parse errors instead of silently falling back to defaults
-                match toml::from_str(&content) {
-                    Ok(config) => config,
+                match toml::from_str::<AppConfig>(&content) {
+                    Ok(mut config) => {
+                        // Migrate last_workspace → workspaces
+                        if let Some(ref lw) = config.last_workspace {
+                            if config.workspaces.is_empty() {
+                                config.workspaces = vec![lw.clone()];
+                                config.last_workspace = None;
+                                let _ = config.save();
+                            }
+                        }
+                        config
+                    }
                     Err(e) => {
                         eprintln!("Warning: config parse error at {}: {e}. Using defaults.", path.display());
                         Self::default()
