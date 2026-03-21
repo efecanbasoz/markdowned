@@ -7,7 +7,7 @@
   import { workspace } from "$lib/stores/workspace.svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import { openFile, saveFile } from "$lib/commands/file";
-  import { scanDirectory } from "$lib/commands/workspace";
+  import { scanDirectory, unwatchWorkspace } from "$lib/commands/workspace";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
@@ -16,7 +16,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { loadConfig } from "$lib/commands/config";
+  import { loadConfig, saveConfig } from "$lib/commands/config";
+  import { calculatePanelSize } from "$lib/utils/resize";
 
   let editorComponent = $state<Editor | null>(null);
   let showPalette = $state(false);
@@ -25,17 +26,87 @@
   let errorMessage = $state<string | null>(null);
   let previousTabId = $state<string | null>(null);
 
+  // Resizable sidebar
+  let sidebarWidth = $state(220);
+  let resizingSidebar = $state(false);
+  let appLayoutEl = $state<HTMLDivElement | null>(null);
+
+  function handleSidebarDividerDown(e: MouseEvent) {
+    e.preventDefault();
+    resizingSidebar = true;
+  }
+
+  function handleMouseMove(e: MouseEvent) {
+    if (resizingSidebar && appLayoutEl) {
+      const rect = appLayoutEl.getBoundingClientRect();
+      sidebarWidth = calculatePanelSize(e.clientX, rect.left, rect.width, 140, 500);
+    }
+    if (resizingSplit && splitContainerEl) {
+      const rect = splitContainerEl.getBoundingClientRect();
+      if (editor.splitDirection === "vertical") {
+        const totalHeight = rect.height;
+        const pos = calculatePanelSize(e.clientY, rect.top, totalHeight, 100, totalHeight - 100);
+        splitRatio = pos / totalHeight;
+      } else {
+        const totalWidth = rect.width;
+        const pos = calculatePanelSize(e.clientX, rect.left, totalWidth, 100, totalWidth - 100);
+        splitRatio = pos / totalWidth;
+      }
+    }
+  }
+
+  function handleMouseUp() {
+    resizingSidebar = false;
+    resizingSplit = false;
+  }
+
+  // Resizable split view
+  let splitRatio = $state(0.5);
+  let resizingSplit = $state(false);
+  let splitContainerEl = $state<HTMLDivElement | null>(null);
+
+  function handleSplitDividerDown(e: MouseEvent) {
+    e.preventDefault();
+    resizingSplit = true;
+  }
+
   function showError(msg: string) {
     errorMessage = msg;
     setTimeout(() => { errorMessage = null; }, 5000);
   }
 
-  async function handleOpenWorkspace() {
+  async function handleAddWorkspace() {
     const selected = await open({ directory: true });
-    // QA-010: Runtime guard instead of unsafe cast
     if (typeof selected === "string") {
-      workspace.workspaceRoot = selected;
-      workspace.entries = await scanDirectory(selected);
+      try {
+        const entries = await scanDirectory(selected);
+        const name = selected.split("/").pop() ?? "Workspace";
+        workspace.addWorkspace({ root: selected, name, entries, collapsed: false });
+        await invoke("watch_workspace", { path: selected });
+        await saveCurrentWorkspaces();
+      } catch (e) {
+        console.error("Failed to add workspace:", e);
+        showError("Failed to add workspace");
+      }
+    }
+  }
+
+  async function handleRemoveWorkspace(root: string) {
+    try {
+      await unwatchWorkspace(root);
+    } catch { /* watcher may already be stopped */ }
+    workspace.removeWorkspace(root);
+    await saveCurrentWorkspaces();
+  }
+
+  async function saveCurrentWorkspaces() {
+    try {
+      const config = await loadConfig();
+      config.workspaces = workspace.workspaces.map((w) => w.root);
+      await saveConfig(config);
+    } catch (e) {
+      console.error("Failed to save workspaces:", e);
+      showError("Failed to save workspace list");
     }
   }
 
@@ -90,26 +161,42 @@
     }
   }
 
-  // Load saved theme on startup
+  // Load saved workspaces and theme on startup
   onMount(() => {
-    loadConfig().then((config) => {
+    loadConfig().then(async (config) => {
       const savedTheme = config.theme === "light" ? "light" : "dark";
       editor.theme = savedTheme;
       document.documentElement.setAttribute("data-theme", savedTheme);
+      const roots = config.workspaces ?? [];
+      for (const root of roots) {
+        try {
+          const entries = await scanDirectory(root);
+          const name = root.split("/").pop() ?? "Workspace";
+          workspace.addWorkspace({ root, name, entries, collapsed: false });
+          await invoke("watch_workspace", { path: root });
+        } catch (e) {
+          console.error(`Failed to restore workspace ${root}:`, e);
+        }
+      }
     });
   });
 
-  // Start filesystem watcher when workspace opens
+  // Start filesystem watcher for all workspaces
   $effect(() => {
-    const root = workspace.workspaceRoot;
-    if (!root) return;
+    const wsCount = workspace.workspaces.length;
+    if (wsCount === 0) return;
 
     let unlisten: (() => void) | undefined;
 
     (async () => {
-      await invoke("watch_workspace", { path: root });
-      unlisten = await listen("file-changed", async () => {
-        workspace.entries = await scanDirectory(root);
+      unlisten = await listen<{ workspaceRoot: string }>("file-changed", async (event) => {
+        const changedRoot = event.payload.workspaceRoot;
+        try {
+          const entries = await scanDirectory(changedRoot);
+          workspace.updateEntries(changedRoot, entries);
+        } catch {
+          // Folder may have been deleted
+        }
       });
     })();
 
@@ -159,7 +246,7 @@
   function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key === "s") { e.preventDefault(); handleSave(); }
-    if (mod && e.key === "o") { e.preventDefault(); handleOpenWorkspace(); }
+    if (mod && e.key === "o") { e.preventDefault(); handleAddWorkspace(); }
     if (mod && e.shiftKey && (e.key === "P" || e.key === "p")) {
       e.preventDefault();
       editor.viewMode = editor.viewMode === "edit" ? "preview" : "edit";
@@ -192,14 +279,19 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
-<div class="app-layout">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="app-layout" class:resizing={resizingSidebar || resizingSplit} bind:this={appLayoutEl}>
   {#if workspace.sidebarVisible}
-    <Sidebar onFileSelect={handleFileSelect} />
+    <div class="sidebar-wrapper" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">
+      <Sidebar onFileSelect={handleFileSelect} onAddWorkspace={handleAddWorkspace} onRemoveWorkspace={handleRemoveWorkspace} />
+    </div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="sidebar-divider" onmousedown={handleSidebarDividerDown}></div>
   {/if}
   <main class="main-area">
-    <TabBar />
+    <TabBar onSettingsClick={() => showSettings = !showSettings} />
     <div class="content-area">
       {#if editor.tabs.length > 0 && editor.activeTabId}
         {#if editor.viewMode === "edit"}
@@ -207,9 +299,16 @@
         {:else if editor.viewMode === "preview"}
           <Preview />
         {:else}
-          <div class="split-view" class:vertical={editor.splitDirection === "vertical"}>
-            <div class="split-pane"><Editor bind:this={editorComponent} /></div>
-            <div class="split-divider"></div>
+          <div
+            class="split-view"
+            class:vertical={editor.splitDirection === "vertical"}
+            bind:this={splitContainerEl}
+          >
+            <div class="split-pane" style="{editor.splitDirection === 'vertical' ? 'height' : 'width'}: {splitRatio * 100}%; flex: none;">
+              <Editor bind:this={editorComponent} />
+            </div>
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="split-divider" onmousedown={handleSplitDividerDown}></div>
             <div class="split-pane"><Preview /></div>
           </div>
         {/if}
@@ -217,7 +316,7 @@
         <div class="placeholder">
           <div class="placeholder-content">
             <p>Open a workspace to start editing</p>
-            <button class="open-btn" onclick={handleOpenWorkspace}>
+            <button class="open-btn" onclick={handleAddWorkspace}>
               Open Workspace
             </button>
             <span class="shortcut">Ctrl+O</span>
@@ -241,14 +340,36 @@
 
 <style>
   .app-layout { display: flex; height: 100vh; width: 100%; }
+  .app-layout.resizing { cursor: col-resize; user-select: none; }
   .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  .sidebar-wrapper { display: flex; flex-shrink: 0; overflow: hidden; }
+  .sidebar-divider {
+    width: 4px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  .sidebar-divider:hover,
+  .app-layout.resizing .sidebar-divider {
+    background: var(--accent);
+  }
+
   .split-view { display: flex; flex: 1; min-height: 0; }
   .split-view.vertical { flex-direction: column; }
   .split-pane { flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
-  .split-divider { flex-shrink: 0; background: var(--border); }
-  .split-view:not(.vertical) > .split-divider { width: 1px; }
-  .split-view.vertical > .split-divider { height: 1px; }
+  .split-divider {
+    flex-shrink: 0;
+    background: var(--border);
+    cursor: col-resize;
+    transition: background 0.15s;
+  }
+  .split-view:not(.vertical) > .split-divider { width: 4px; }
+  .split-view.vertical > .split-divider { height: 4px; cursor: row-resize; }
+  .split-divider:hover { background: var(--accent); }
   .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; }
   .placeholder-content { text-align: center; color: var(--text-dimmed); }
   .open-btn {
