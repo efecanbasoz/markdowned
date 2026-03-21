@@ -11,7 +11,6 @@
   let baseUrl = $state("");
   let customBaseUrl = $state("");
   let customModel = $state("");
-  let lastWorkspace = $state<string | null>(null);
   let splitDirection = $state<SplitDirection>("horizontal");
   let autoCompletion = $state(false);
   let selectedTheme = $state<"dark" | "light">("dark");
@@ -33,7 +32,6 @@
         baseUrl = config.completion.baseUrl;
         customBaseUrl = config.completion.custom.baseUrl;
         customModel = config.completion.custom.model;
-        lastWorkspace = config.lastWorkspace;
         splitDirection = config.splitDirection ?? "horizontal";
         autoCompletion = config.completion.autoCompletion ?? false;
         selectedTheme = config.theme === "light" ? "light" : "dark";
@@ -42,6 +40,8 @@
   });
 
   async function handleSave() {
+    // Load existing config first to preserve workspaces list
+    const existing = await loadConfig();
     const config: AppConfig = {
       completion: {
         provider,
@@ -51,7 +51,7 @@
         autoCompletion,
         custom: { baseUrl: customBaseUrl, model: customModel },
       },
-      lastWorkspace,
+      workspaces: existing.workspaces,
       splitDirection,
       theme: selectedTheme,
     };
