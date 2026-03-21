@@ -151,19 +151,43 @@ pub fn render_markdown(input: &str) -> String {
 /// Allows tags and attributes needed for rendered markdown (tables, code blocks,
 /// task lists, etc.) while stripping dangerous elements like `<script>` and
 /// event handler attributes.
+/// SEC-007: Filter CSS to prevent UI redressing attacks.
+/// Only allow safe properties needed for syntax highlighting.
+fn filter_style(style: &str) -> Option<String> {
+    let safe_props = ["color", "background-color", "background", "font-weight",
+                      "font-style", "text-decoration", "opacity"];
+    let filtered: Vec<&str> = style.split(';')
+        .filter(|decl| {
+            let trimmed = decl.trim().to_lowercase();
+            safe_props.iter().any(|p| trimmed.starts_with(p))
+        })
+        .collect();
+    if filtered.is_empty() { None } else { Some(filtered.join(";")) }
+}
+
 fn sanitize_html(html: &str) -> String {
-    ammonia::Builder::default()
-        .add_tags(&["pre", "code", "span", "table", "thead", "tbody", "tr", "th", "td", "input", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "strong", "em", "del", "ul", "ol", "li", "blockquote", "hr", "br", "img", "div"])
+    let cleaned = ammonia::Builder::default()
+        .add_tags(&["pre", "code", "span", "table", "thead", "tbody", "tr", "th", "td", "input", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "strong", "em", "del", "ul", "ol", "li", "blockquote", "hr", "br", "img"])
         .add_tag_attributes("pre", &["class", "data-lang", "style"])
         .add_tag_attributes("code", &["class", "style"])
         .add_tag_attributes("span", &["style"])
         .add_tag_attributes("input", &["type", "checked", "disabled"])
         .add_tag_attributes("a", &["href", "title"])
         .add_tag_attributes("img", &["src", "alt", "title"])
-        .add_tag_attributes("div", &["class", "style"])
         .link_rel(Some("noopener noreferrer"))
+        .attribute_filter(|_element, attribute, value| {
+            if attribute == "style" {
+                match filter_style(value) {
+                    Some(filtered) => Some(filtered.into()),
+                    None => None,
+                }
+            } else {
+                Some(value.into())
+            }
+        })
         .clean(html)
-        .to_string()
+        .to_string();
+    cleaned
 }
 
 /// Render markdown to HTML, extracting YAML frontmatter if present.

@@ -109,17 +109,15 @@ export const editor = {
       return;
     }
 
-    // Enforce max tabs — close the oldest non-active, non-dirty tab
+    // QA-003: Enforce max tabs — only close non-dirty tabs, never discard unsaved work
     if (tabs.length >= MAX_TABS) {
       const closeable = tabs.find((t) => t.id !== activeTabId && !t.dirty);
       if (closeable) {
         tabs = tabs.filter((t) => t.id !== closeable.id);
       } else {
-        // All tabs dirty — close the oldest anyway
-        const oldest = tabs.find((t) => t.id !== activeTabId);
-        if (oldest) {
-          tabs = tabs.filter((t) => t.id !== oldest.id);
-        }
+        // All tabs are dirty — refuse to open instead of silently discarding work
+        console.warn("Cannot open new tab: all tabs have unsaved changes. Save or close a tab first.");
+        return;
       }
     }
 
