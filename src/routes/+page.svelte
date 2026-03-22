@@ -7,19 +7,24 @@
   import { workspace } from "$lib/stores/workspace.svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import { openFile, saveFile } from "$lib/commands/file";
-  import { scanDirectory, unwatchWorkspace } from "$lib/commands/workspace";
+  import {
+    addWorkspace,
+    restoreWorkspace,
+    scanDirectory,
+    unwatchWorkspace,
+  } from "$lib/commands/workspace";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import { renderPreview } from "$lib/commands/preview";
-  import { open } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
-  import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { loadConfig, saveConfig } from "$lib/commands/config";
+  import { loadConfig } from "$lib/commands/config";
   import { calculatePanelSize } from "$lib/utils/resize";
+  import type { ScrollMetrics } from "$lib/utils/scroll-sync";
 
   let editorComponent = $state<Editor | null>(null);
+  let previewComponent = $state<Preview | null>(null);
   let showPalette = $state(false);
   let showSearch = $state(false);
   let showSettings = $state(false);
@@ -75,19 +80,32 @@
     setTimeout(() => { errorMessage = null; }, 5000);
   }
 
+  function syncPreviewScroll() {
+    if (editor.viewMode !== "split") return;
+    const metrics = editorComponent?.getScrollMetrics();
+    if (metrics) {
+      previewComponent?.syncScroll(metrics);
+    }
+  }
+
+  function handleEditorScroll(metrics: ScrollMetrics) {
+    if (editor.viewMode !== "split") return;
+    previewComponent?.syncScroll(metrics);
+  }
+
+  function handlePreviewScroll(metrics: ScrollMetrics) {
+    if (editor.viewMode !== "split") return;
+    editorComponent?.syncScroll(metrics);
+  }
+
   async function handleAddWorkspace() {
-    const selected = await open({ directory: true });
-    if (typeof selected === "string") {
-      try {
-        const entries = await scanDirectory(selected);
-        const name = selected.split("/").pop() ?? "Workspace";
-        workspace.addWorkspace({ root: selected, name, entries, collapsed: false });
-        await invoke("watch_workspace", { path: selected });
-        await saveCurrentWorkspaces();
-      } catch (e) {
-        console.error("Failed to add workspace:", e);
-        showError("Failed to add workspace");
-      }
+    try {
+      const selected = await addWorkspace();
+      if (!selected) return;
+      workspace.addWorkspace({ ...selected, collapsed: false });
+    } catch (e) {
+      console.error("Failed to add workspace:", e);
+      showError("Failed to add workspace");
     }
   }
 
@@ -96,18 +114,6 @@
       await unwatchWorkspace(root);
     } catch { /* watcher may already be stopped */ }
     workspace.removeWorkspace(root);
-    await saveCurrentWorkspaces();
-  }
-
-  async function saveCurrentWorkspaces() {
-    try {
-      const config = await loadConfig();
-      config.workspaces = workspace.workspaces.map((w) => w.root);
-      await saveConfig(config);
-    } catch (e) {
-      console.error("Failed to save workspaces:", e);
-      showError("Failed to save workspace list");
-    }
   }
 
   async function handleFileSelect(path: string) {
@@ -143,6 +149,7 @@
     try {
       const result = await renderPreview(content);
       editor.updateActivePreview(result.html, result.frontmatter);
+      requestAnimationFrame(syncPreviewScroll);
     } catch (e) {
       console.error("Preview render failed:", e);
       showError("Preview render failed");
@@ -170,10 +177,8 @@
       const roots = config.workspaces ?? [];
       for (const root of roots) {
         try {
-          const entries = await scanDirectory(root);
-          const name = root.split("/").pop() ?? "Workspace";
-          workspace.addWorkspace({ root, name, entries, collapsed: false });
-          await invoke("watch_workspace", { path: root });
+          const restored = await restoreWorkspace(root);
+          workspace.addWorkspace({ ...restored, collapsed: false });
         } catch (e) {
           console.error(`Failed to restore workspace ${root}:`, e);
         }
@@ -227,11 +232,23 @@
         // Restore cursor and scroll after content is set
         requestAnimationFrame(() => {
           editorComponent?.restoreState(newTab.cursorPos, newTab.scrollTop);
+          syncPreviewScroll();
         });
       }
 
       previousTabId = currentTabId;
     }
+  });
+
+  $effect(() => {
+    const viewMode = editor.viewMode;
+    const direction = editor.splitDirection;
+    const ratio = splitRatio;
+    const activeTabId = editor.activeTabId;
+    const previewHtml = editor.previewHtml;
+    if (viewMode !== "split" || !activeTabId) return;
+
+    requestAnimationFrame(syncPreviewScroll);
   });
 
   // Debounced preview updates on content change
@@ -305,11 +322,11 @@
             bind:this={splitContainerEl}
           >
             <div class="split-pane" style="{editor.splitDirection === 'vertical' ? 'height' : 'width'}: {splitRatio * 100}%; flex: none;">
-              <Editor bind:this={editorComponent} />
+              <Editor bind:this={editorComponent} onScrollChange={handleEditorScroll} />
             </div>
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="split-divider" onmousedown={handleSplitDividerDown}></div>
-            <div class="split-pane"><Preview /></div>
+            <div class="split-pane"><Preview bind:this={previewComponent} onScrollChange={handlePreviewScroll} /></div>
           </div>
         {/if}
       {:else}

@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd, html};
+use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
 use syntect::highlighting::ThemeSet;
 use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
@@ -34,7 +34,7 @@ fn extract_frontmatter(input: &str) -> (Option<String>, &str) {
     if let Some(end_pos) = trimmed[after_opening..].find("\n---") {
         let frontmatter = trimmed[after_opening..after_opening + end_pos].to_string();
         let closing_line_end = after_opening + end_pos + 4; // "\n---" = 4 chars
-        // Skip past the closing delimiter line
+                                                            // Skip past the closing delimiter line
         let remaining_start = match trimmed[closing_line_end..].find('\n') {
             Some(pos) => closing_line_end + pos + 1,
             None => trimmed.len(),
@@ -154,20 +154,68 @@ pub fn render_markdown(input: &str) -> String {
 /// SEC-007: Filter CSS to prevent UI redressing attacks.
 /// Only allow safe properties needed for syntax highlighting.
 fn filter_style(style: &str) -> Option<String> {
-    let safe_props = ["color", "background-color", "background", "font-weight",
-                      "font-style", "text-decoration", "opacity"];
-    let filtered: Vec<&str> = style.split(';')
+    let safe_props = [
+        "color",
+        "background-color",
+        "font-weight",
+        "font-style",
+        "text-decoration",
+        "opacity",
+    ];
+    let filtered: Vec<&str> = style
+        .split(';')
         .filter(|decl| {
             let trimmed = decl.trim().to_lowercase();
             safe_props.iter().any(|p| trimmed.starts_with(p))
         })
         .collect();
-    if filtered.is_empty() { None } else { Some(filtered.join(";")) }
+    if filtered.is_empty() {
+        None
+    } else {
+        Some(filtered.join(";"))
+    }
+}
+
+fn is_safe_image_src(src: &str) -> bool {
+    let trimmed = src.trim();
+    match reqwest::Url::parse(trimmed) {
+        Ok(url) => matches!(url.scheme(), "asset" | "data"),
+        Err(_) => !trimmed.starts_with("//") && !trimmed.contains(':'),
+    }
 }
 
 fn sanitize_html(html: &str) -> String {
     let cleaned = ammonia::Builder::default()
-        .add_tags(&["pre", "code", "span", "table", "thead", "tbody", "tr", "th", "td", "input", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "strong", "em", "del", "ul", "ol", "li", "blockquote", "hr", "br", "img"])
+        .add_tags(&[
+            "pre",
+            "code",
+            "span",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "th",
+            "td",
+            "input",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "p",
+            "a",
+            "strong",
+            "em",
+            "del",
+            "ul",
+            "ol",
+            "li",
+            "blockquote",
+            "hr",
+            "br",
+            "img",
+        ])
         .add_tag_attributes("pre", &["class", "data-lang", "style"])
         .add_tag_attributes("code", &["class", "style"])
         .add_tag_attributes("span", &["style"])
@@ -175,11 +223,17 @@ fn sanitize_html(html: &str) -> String {
         .add_tag_attributes("a", &["href", "title"])
         .add_tag_attributes("img", &["src", "alt", "title"])
         .link_rel(Some("noopener noreferrer"))
-        .attribute_filter(|_element, attribute, value| {
+        .attribute_filter(|element, attribute, value| {
             if attribute == "style" {
                 match filter_style(value) {
                     Some(filtered) => Some(filtered.into()),
                     None => None,
+                }
+            } else if element == "img" && attribute == "src" {
+                if is_safe_image_src(value) {
+                    Some(value.into())
+                } else {
+                    None
                 }
             } else {
                 Some(value.into())

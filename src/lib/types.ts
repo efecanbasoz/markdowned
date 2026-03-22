@@ -43,6 +43,12 @@ export interface WorkspaceEntry {
   collapsed: boolean;
 }
 
+export interface WorkspaceSelection {
+  root: string;
+  name: string;
+  entries: FileEntry[];
+}
+
 export type ViewMode = "edit" | "preview" | "split";
 export type SplitDirection = "horizontal" | "vertical";
 

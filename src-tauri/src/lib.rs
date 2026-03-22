@@ -10,7 +10,9 @@ pub struct WorkspaceState {
 
 impl Default for WorkspaceState {
     fn default() -> Self {
-        Self { roots: Arc::new(Mutex::new(Vec::new())) }
+        Self {
+            roots: Arc::new(Mutex::new(Vec::new())),
+        }
     }
 }
 
@@ -27,8 +29,9 @@ pub fn run() {
             commands::file::create_file,
             commands::file::delete_file,
             commands::file::rename_file,
+            commands::workspace::add_workspace,
+            commands::workspace::restore_workspace,
             commands::workspace::scan_directory,
-            commands::workspace::watch_workspace,
             commands::workspace::search_workspace,
             commands::workspace::unwatch_workspace,
             commands::preview::render_preview,

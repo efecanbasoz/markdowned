@@ -1,5 +1,9 @@
 <script lang="ts">
   import { editor } from "$lib/stores/editor.svelte";
+
+  let { onSettingsClick }: {
+    onSettingsClick?: () => void;
+  } = $props();
 </script>
 
 <div class="tabbar">
@@ -41,6 +45,19 @@
       class:active={editor.viewMode === "preview"}
       onclick={() => editor.viewMode = "preview"}
     >Preview</button>
+    {#if onSettingsClick}
+      <button
+        class="settings-btn"
+        onclick={onSettingsClick}
+        aria-label="Settings"
+        title="Settings (Ctrl+,)"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    {/if}
   </div>
 </div>
 
@@ -167,5 +184,26 @@
   .view-btn.active {
     color: var(--text-primary);
     background: var(--surface-elevated);
+  }
+
+  .settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 0;
+    margin-left: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .settings-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
   }
 </style>

@@ -14,9 +14,7 @@ pub fn resolve_base_url(config: &CompletionConfig) -> String {
     match config.provider {
         Provider::Ollama => "http://localhost:11434/v1".to_string(),
         Provider::OpenAI => "https://api.openai.com/v1".to_string(),
-        Provider::Google => {
-            "https://generativelanguage.googleapis.com/v1beta/openai".to_string()
-        }
+        Provider::Google => "https://generativelanguage.googleapis.com/v1beta/openai".to_string(),
         Provider::Anthropic => "https://api.anthropic.com/v1".to_string(),
         Provider::Custom => {
             if !config.custom.base_url.is_empty() {
@@ -113,10 +111,7 @@ pub async fn stream_completion(
                 HeaderValue::from_str(&config.api_key).map_err(|e| e.to_string())?,
             );
         }
-        headers.insert(
-            "anthropic-version",
-            HeaderValue::from_static("2023-06-01"),
-        );
+        headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
     } else if !config.api_key.is_empty() {
         headers.insert(
             AUTHORIZATION,
@@ -127,7 +122,9 @@ pub async fn stream_completion(
 
     // SEC-005: Validate URL scheme for non-loopback hosts
     if let Ok(parsed_url) = reqwest::Url::parse(&url) {
-        let is_loopback = parsed_url.host_str().map_or(false, |h| h == "localhost" || h == "127.0.0.1" || h == "::1");
+        let is_loopback = parsed_url.host_str().map_or(false, |h| {
+            h == "localhost" || h == "127.0.0.1" || h == "::1"
+        });
         if !is_loopback && parsed_url.scheme() != "https" {
             return Err("Non-loopback LLM endpoints must use HTTPS".to_string());
         }

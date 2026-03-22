@@ -86,11 +86,8 @@ fn test_rename_file_moves_file() {
 #[test]
 fn test_validate_rejects_path_outside_workspace() {
     let dir = TempDir::new().unwrap();
-    let workspace = dir.path().to_str().unwrap().to_string();
-    let result = markdowned_lib::commands::file::validate_within_workspace(
-        "/etc/passwd",
-        &Some(workspace),
-    );
+    let workspace = vec![dir.path().to_str().unwrap().to_string()];
+    let result = markdowned_lib::commands::file::resolve_safe_path("/etc/passwd", &workspace);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("outside workspace"));
 }
@@ -100,20 +97,15 @@ fn test_validate_accepts_path_inside_workspace() {
     let dir = TempDir::new().unwrap();
     let file = dir.path().join("test.md");
     fs::write(&file, "test").unwrap();
-    let workspace = dir.path().to_str().unwrap().to_string();
-    let result = markdowned_lib::commands::file::validate_within_workspace(
-        file.to_str().unwrap(),
-        &Some(workspace),
-    );
+    let workspace = vec![dir.path().to_str().unwrap().to_string()];
+    let result =
+        markdowned_lib::commands::file::resolve_safe_path(file.to_str().unwrap(), &workspace);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_validate_rejects_when_no_workspace() {
-    let result = markdowned_lib::commands::file::validate_within_workspace(
-        "/some/file.md",
-        &None,
-    );
+    let result = markdowned_lib::commands::file::resolve_safe_path("/some/file.md", &[]);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("No workspace"));
 }

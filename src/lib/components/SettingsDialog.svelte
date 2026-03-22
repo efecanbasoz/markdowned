@@ -71,12 +71,18 @@
       handleCancel();
     }
   }
+
+  function handleOverlayClick(e: MouseEvent) {
+    if (e.target === e.currentTarget) {
+      handleCancel();
+    }
+  }
 </script>
 
 {#if visible}
-  <div class="overlay" role="presentation" onclick={handleCancel} onkeydown={handleOverlayKeydown}>
-    <!-- svelte-ignore a11y_interactive_supports_focus a11y_click_events_have_key_events -->
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" onclick={(e) => e.stopPropagation()}>
+  <div class="overlay" role="presentation" onclick={handleOverlayClick} onkeydown={handleOverlayKeydown}>
+    <!-- svelte-ignore a11y_interactive_supports_focus -->
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <h2 id="settings-title" class="dialog-title">Settings</h2>
 
       <div class="field">

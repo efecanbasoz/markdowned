@@ -5,9 +5,11 @@ fn default_config(provider: Provider) -> CompletionConfig {
     CompletionConfig {
         provider,
         api_key: String::new(),
+        api_key_in_keychain: false,
         model: String::new(),
         base_url: String::new(),
         custom: CustomProviderConfig::default(),
+        auto_completion: false,
     }
 }
 

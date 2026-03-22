@@ -1,8 +1,74 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { editor } from "$lib/stores/editor.svelte";
+  import type { ScrollMetrics } from "$lib/utils/scroll-sync";
+  import { mapScrollToTarget } from "$lib/utils/scroll-sync";
+
+  let { onScrollChange = undefined }: {
+    onScrollChange?: (metrics: ScrollMetrics) => void;
+  } = $props();
+
+  let previewContainer = $state<HTMLDivElement | null>(null);
+  let pendingSyncedScrollTop: number | null = null;
+
+  export function getScrollMetrics(): ScrollMetrics | null {
+    if (!previewContainer) return null;
+    const { scrollTop, scrollHeight, clientHeight } = previewContainer;
+    return { scrollTop, scrollHeight, clientHeight };
+  }
+
+  function emitScrollChange() {
+    const metrics = getScrollMetrics();
+    if (metrics) {
+      onScrollChange?.(metrics);
+    }
+  }
+
+  function clearPendingSyncIfMatched(currentScrollTop: number) {
+    if (
+      pendingSyncedScrollTop !== null &&
+      Math.abs(currentScrollTop - pendingSyncedScrollTop) < 1
+    ) {
+      pendingSyncedScrollTop = null;
+      return true;
+    }
+    return false;
+  }
+
+  export function syncScroll(metrics: ScrollMetrics) {
+    if (!previewContainer) return;
+    const targetScrollTop = mapScrollToTarget(
+      metrics,
+      previewContainer.scrollHeight,
+      previewContainer.clientHeight,
+    );
+
+    pendingSyncedScrollTop = targetScrollTop;
+    previewContainer.scrollTop = targetScrollTop;
+
+    requestAnimationFrame(() => {
+      if (previewContainer) {
+        clearPendingSyncIfMatched(previewContainer.scrollTop);
+      }
+    });
+  }
+
+  onMount(() => {
+    const handleScroll = () => {
+      if (!previewContainer) return;
+      if (clearPendingSyncIfMatched(previewContainer.scrollTop)) return;
+      emitScrollChange();
+    };
+
+    previewContainer?.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      previewContainer?.removeEventListener("scroll", handleScroll);
+    };
+  });
 </script>
 
-<div class="preview-container">
+<div class="preview-container" bind:this={previewContainer}>
   {#if editor.frontmatter}
     <div class="frontmatter-badge">
       {#each editor.frontmatter.split("\n").filter(Boolean) as line}
@@ -23,9 +89,9 @@
 <style>
   .preview-container {
     height: 100%;
+    width: 100%;
     overflow-y: auto;
     padding: 32px 48px;
-    max-width: 780px;
   }
 
   .frontmatter-badge {

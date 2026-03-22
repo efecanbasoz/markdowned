@@ -10,11 +10,17 @@
   } from "$lib/editor/ghost-text";
   import { requestCompletion } from "$lib/commands/completion";
   import { loadConfig } from "$lib/commands/config";
+  import { mapScrollToTarget, type ScrollMetrics } from "$lib/utils/scroll-sync";
+
+  let { onScrollChange = undefined }: {
+    onScrollChange?: (metrics: ScrollMetrics) => void;
+  } = $props();
 
   let container: HTMLDivElement;
   let view: EditorView | null = null;
   let autoCompletionEnabled = false;
   let autoCompletionTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingSyncedScrollTop: number | null = null;
 
   export function setContent(content: string) {
     if (!view) return;
@@ -27,6 +33,48 @@
     return view;
   }
 
+  export function getScrollMetrics(): ScrollMetrics | null {
+    if (!view) return null;
+    const { scrollTop, scrollHeight, clientHeight } = view.scrollDOM;
+    return { scrollTop, scrollHeight, clientHeight };
+  }
+
+  function emitScrollChange() {
+    const metrics = getScrollMetrics();
+    if (metrics) {
+      onScrollChange?.(metrics);
+    }
+  }
+
+  function clearPendingSyncIfMatched(currentScrollTop: number) {
+    if (
+      pendingSyncedScrollTop !== null &&
+      Math.abs(currentScrollTop - pendingSyncedScrollTop) < 1
+    ) {
+      pendingSyncedScrollTop = null;
+      return true;
+    }
+    return false;
+  }
+
+  export function syncScroll(metrics: ScrollMetrics) {
+    if (!view) return;
+    const targetScrollTop = mapScrollToTarget(
+      metrics,
+      view.scrollDOM.scrollHeight,
+      view.scrollDOM.clientHeight,
+    );
+
+    pendingSyncedScrollTop = targetScrollTop;
+    view.scrollDOM.scrollTop = targetScrollTop;
+
+    requestAnimationFrame(() => {
+      if (view) {
+        clearPendingSyncIfMatched(view.scrollDOM.scrollTop);
+      }
+    });
+  }
+
   export function restoreState(cursorPos: number, scrollTop: number) {
     if (!view) return;
     try {
@@ -34,6 +82,7 @@
       const safePos = Math.min(cursorPos, docLength);
       view.dispatch({ selection: { anchor: safePos } });
       view.scrollDOM.scrollTop = scrollTop;
+      emitScrollChange();
     } catch {
       // Ignore if position is invalid
     }
@@ -100,11 +149,19 @@
       extensions: createExtensions(handleUpdate, triggerCompletion, editorStore.theme === "dark"),
     });
     view = new EditorView({ state, parent: container });
+    const handleScroll = () => {
+      if (!view) return;
+      if (clearPendingSyncIfMatched(view.scrollDOM.scrollTop)) return;
+      emitScrollChange();
+    };
+    view.scrollDOM.addEventListener("scroll", handleScroll, { passive: true });
 
     // Restore cursor/scroll for the active tab
     const activeTab = editorStore.activeTab;
     if (activeTab && (activeTab.cursorPos > 0 || activeTab.scrollTop > 0)) {
       restoreState(activeTab.cursorPos, activeTab.scrollTop);
+    } else {
+      emitScrollChange();
     }
 
     // Load config to check if auto-completion is enabled
@@ -115,6 +172,7 @@
     return () => {
       cleanupCompletion?.();
       if (autoCompletionTimer) clearTimeout(autoCompletionTimer);
+      view?.scrollDOM.removeEventListener("scroll", handleScroll);
       view?.destroy();
       view = null;
     };

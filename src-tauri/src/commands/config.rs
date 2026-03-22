@@ -17,10 +17,15 @@ pub async fn load_config() -> Result<AppConfig, String> {
     .map_err(|e| format!("Task failed: {e}"))
 }
 
-
 #[tauri::command]
 pub async fn save_config(mut config: AppConfig) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
+        // Workspace approvals are managed server-side by workspace commands.
+        // Ignore any frontend attempt to replace them wholesale.
+        let existing = AppConfig::load();
+        config.workspaces = existing.workspaces;
+        config.last_workspace = existing.last_workspace;
+
         // Attempt to store the API key in the OS keychain
         if !config.completion.api_key.is_empty() && keychain::is_available() {
             let provider_name = format!("{:?}", config.completion.provider).to_lowercase();

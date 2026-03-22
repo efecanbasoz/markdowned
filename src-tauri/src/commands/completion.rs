@@ -15,17 +15,25 @@ struct CompletionDone {
 }
 
 #[tauri::command]
-pub async fn request_completion(app: AppHandle, context: String, request_id: String) -> Result<(), String> {
+pub async fn request_completion(
+    app: AppHandle,
+    context: String,
+    request_id: String,
+) -> Result<(), String> {
     let mut config = AppConfig::load();
     let resolved_key = config.completion.resolve_api_key();
     config.completion.api_key = resolved_key;
 
     let rid = request_id.clone();
+    let app_clone = app.clone();
     crate::services::llm::stream_completion(&config.completion, &context, move |chunk| {
-        let _ = app.emit("completion-chunk", CompletionChunk {
-            request_id: rid.clone(),
-            text: chunk,
-        });
+        let _ = app_clone.emit(
+            "completion-chunk",
+            CompletionChunk {
+                request_id: rid.clone(),
+                text: chunk,
+            },
+        );
     })
     .await?;
     let _ = app.emit("completion-done", CompletionDone { request_id });

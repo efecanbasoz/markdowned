@@ -3,6 +3,9 @@ use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
 
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+
 #[test]
 fn test_scan_directory_returns_tree() {
     let dir = TempDir::new().unwrap();
@@ -104,8 +107,7 @@ fn test_search_respects_gitignore() {
     fs::create_dir(dir.path().join("ignored")).unwrap();
     fs::write(dir.path().join("ignored/file.md"), "searchterm").unwrap();
     fs::write(dir.path().join("visible.md"), "searchterm here").unwrap();
-    let results =
-        search_workspace_impl(dir.path().to_str().unwrap(), "searchterm").unwrap();
+    let results = search_workspace_impl(dir.path().to_str().unwrap(), "searchterm").unwrap();
     assert_eq!(results.len(), 1);
     assert!(results[0].file_name.contains("visible"));
 }
@@ -117,4 +119,32 @@ fn test_search_empty_query() {
     let results = search_workspace_impl(dir.path().to_str().unwrap(), "");
     assert!(results.is_ok());
     assert_eq!(results.unwrap().len(), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_scan_directory_skips_symlink_entries() {
+    let dir = TempDir::new().unwrap();
+    let outside = dir.path().join("outside.md");
+    let link = dir.path().join("linked.md");
+    fs::write(&outside, "outside").unwrap();
+    symlink(&outside, &link).unwrap();
+
+    let entries = scan_directory_impl(dir.path().to_str().unwrap()).unwrap();
+    assert!(entries.iter().all(|entry| entry.name != "linked.md"));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_search_does_not_follow_symlinked_files() {
+    let dir = TempDir::new().unwrap();
+    let outside_dir = TempDir::new().unwrap();
+    let outside = outside_dir.path().join("secret.md");
+    let link = dir.path().join("linked.md");
+
+    fs::write(&outside, "super secret needle").unwrap();
+    symlink(&outside, &link).unwrap();
+
+    let results = search_workspace_impl(dir.path().to_str().unwrap(), "needle").unwrap();
+    assert!(results.is_empty());
 }

@@ -69,3 +69,21 @@ fn test_syntax_highlighting_preserved_after_sanitization() {
     assert!(result.contains("<pre"));
     assert!(result.contains("style="));
 }
+
+#[test]
+fn test_remote_image_sources_stripped() {
+    let md = "<img src=\"https://example.com/track.png\" alt=\"tracker\">";
+    let result = renderer::render_markdown(md);
+    assert!(!result.contains("https://example.com/track.png"));
+    assert!(!result.contains("src="));
+    assert!(result.contains("alt=\"tracker\""));
+}
+
+#[test]
+fn test_background_urls_stripped_from_styles() {
+    let md = "<span style=\"background:url(https://example.com/bg.png);color:red\">x</span>";
+    let result = renderer::render_markdown(md);
+    assert!(result.contains("color:red"));
+    assert!(!result.contains("background"));
+    assert!(!result.contains("example.com"));
+}

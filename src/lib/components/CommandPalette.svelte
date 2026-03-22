@@ -9,7 +9,7 @@
 
   let query = $state("");
   let selectedIndex = $state(0);
-  let inputEl: HTMLInputElement;
+  let inputEl = $state<HTMLInputElement | undefined>(undefined);
 
   interface PaletteItem {
     label: string;
@@ -31,7 +31,7 @@
     return items;
   }
 
-  const allItems = $derived(flattenFiles(workspace.entries));
+  const allItems = $derived(workspace.workspaces.flatMap((w) => flattenFiles(w.entries)));
   const filteredItems = $derived(
     query.trim() === ""
       ? allItems.slice(0, 10)

@@ -36,5 +36,4 @@ impl FileEntry {
             children: None,
         }
     }
-
 }

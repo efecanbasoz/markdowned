@@ -131,7 +131,10 @@ impl AppConfig {
                         config
                     }
                     Err(e) => {
-                        eprintln!("Warning: config parse error at {}: {e}. Using defaults.", path.display());
+                        eprintln!(
+                            "Warning: config parse error at {}: {e}. Using defaults.",
+                            path.display()
+                        );
                         Self::default()
                     }
                 }
@@ -156,7 +159,8 @@ impl AppConfig {
                 .mode(0o600)
                 .open(&path)
                 .map_err(|e| e.to_string())?;
-            file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+            file.write_all(content.as_bytes())
+                .map_err(|e| e.to_string())?;
         }
         #[cfg(not(unix))]
         {

@@ -1,6 +1,6 @@
 [package]
 name = "markdowned"
-version = "1.5.0"
+version = "1.7.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -37,4 +37,3 @@ tauri-plugin-dialog = "2.6.0"
 
 [dev-dependencies]
 tempfile = "3"
-

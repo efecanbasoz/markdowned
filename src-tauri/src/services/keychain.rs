@@ -1,16 +1,16 @@
 const SERVICE_NAME: &str = "com.markdowned.app";
 
 pub fn store_api_key(provider: &str, key: &str) -> Result<(), String> {
-    let entry = keyring::Entry::new(SERVICE_NAME, provider)
-        .map_err(|e| format!("Keychain error: {e}"))?;
+    let entry =
+        keyring::Entry::new(SERVICE_NAME, provider).map_err(|e| format!("Keychain error: {e}"))?;
     entry
         .set_password(key)
         .map_err(|e| format!("Failed to store key: {e}"))
 }
 
 pub fn retrieve_api_key(provider: &str) -> Result<Option<String>, String> {
-    let entry = keyring::Entry::new(SERVICE_NAME, provider)
-        .map_err(|e| format!("Keychain error: {e}"))?;
+    let entry =
+        keyring::Entry::new(SERVICE_NAME, provider).map_err(|e| format!("Keychain error: {e}"))?;
     match entry.get_password() {
         Ok(key) => Ok(Some(key)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -19,8 +19,8 @@ pub fn retrieve_api_key(provider: &str) -> Result<Option<String>, String> {
 }
 
 pub fn delete_api_key(provider: &str) -> Result<(), String> {
-    let entry = keyring::Entry::new(SERVICE_NAME, provider)
-        .map_err(|e| format!("Keychain error: {e}"))?;
+    let entry =
+        keyring::Entry::new(SERVICE_NAME, provider).map_err(|e| format!("Keychain error: {e}"))?;
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),

@@ -11,7 +11,7 @@
   let results = $state<SearchMatch[]>([]);
   let selectedIndex = $state(0);
   let searching = $state(false);
-  let inputEl: HTMLInputElement;
+  let inputEl = $state<HTMLInputElement | undefined>(undefined);
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let searchRun = 0;
 

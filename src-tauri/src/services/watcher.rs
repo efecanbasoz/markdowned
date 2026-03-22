@@ -23,11 +23,17 @@ pub struct WatcherState {
 
 impl Default for WatcherState {
     fn default() -> Self {
-        Self { handles: Mutex::new(HashMap::new()) }
+        Self {
+            handles: Mutex::new(HashMap::new()),
+        }
     }
 }
 
-pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &WatcherState) -> Result<(), String> {
+pub fn start_watcher(
+    app: AppHandle,
+    workspace_path: String,
+    watcher_state: &WatcherState,
+) -> Result<(), String> {
     let canonical = std::fs::canonicalize(&workspace_path)
         .map_err(|e| format!("Invalid path: {e}"))?
         .to_string_lossy()
@@ -35,7 +41,10 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
 
     // Remove existing watcher for this path if any
     {
-        let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+        let mut guard = watcher_state
+            .handles
+            .lock()
+            .map_err(|e| format!("Watcher state error: {e}"))?;
         guard.remove(&canonical);
     }
 
@@ -49,7 +58,10 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
         .map_err(|e| format!("Failed to watch directory: {e}"))?;
 
     {
-        let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+        let mut guard = watcher_state
+            .handles
+            .lock()
+            .map_err(|e| format!("Watcher state error: {e}"))?;
         guard.insert(canonical.clone(), WatcherHandle { _watcher: watcher });
     }
 
@@ -57,7 +69,9 @@ pub fn start_watcher(app: AppHandle, workspace_path: String, watcher_state: &Wat
     std::thread::spawn(move || {
         use std::time::{Duration, Instant};
         let debounce_ms = Duration::from_millis(200);
-        let mut last_emit = Instant::now().checked_sub(debounce_ms).unwrap_or_else(Instant::now);
+        let mut last_emit = Instant::now()
+            .checked_sub(debounce_ms)
+            .unwrap_or_else(Instant::now);
 
         while let Ok(event) = rx.recv() {
             if let Ok(Event { kind, paths, .. }) = event {
@@ -96,7 +110,10 @@ pub fn stop_watcher(workspace_path: String, watcher_state: &WatcherState) -> Res
         .unwrap_or_else(|_| std::path::PathBuf::from(&workspace_path))
         .to_string_lossy()
         .to_string();
-    let mut guard = watcher_state.handles.lock().map_err(|e| format!("Watcher state error: {e}"))?;
+    let mut guard = watcher_state
+        .handles
+        .lock()
+        .map_err(|e| format!("Watcher state error: {e}"))?;
     guard.remove(&canonical);
     Ok(())
 }
