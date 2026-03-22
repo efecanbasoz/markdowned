@@ -2,11 +2,28 @@
 
 > The fastest lightweight markdown editor for Linux, macOS, and Windows.
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
-[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)]()
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](./LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)]()
+[![Version](https://img.shields.io/badge/version-1.5.0-2ea043?style=flat-square)](package.json)
 
 Built with [Tauri](https://tauri.app), [Svelte 5](https://svelte.dev), and [CodeMirror 6](https://codemirror.net). No Electron, no bloat.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [AI Completion](#ai-completion-setup)
+- [Configuration](#configuration)
+- [Tech Stack](#tech-stack)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
 
 ## Features
 
@@ -23,26 +40,7 @@ Built with [Tauri](https://tauri.app), [Svelte 5](https://svelte.dev), and [Code
 - **Frontmatter support** — YAML metadata displayed as compact badge in preview
 - **Lightweight** — ~50MB memory, <200ms startup, <10MB binary
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| Ctrl+O | Open workspace |
-| Ctrl+S | Save file |
-| Ctrl+W | Close tab |
-| Ctrl+K | Command palette |
-| Ctrl+Shift+F | Search workspace |
-| Ctrl+\\ | Cycle view mode (Edit → Split → Preview) |
-| Ctrl+Shift+P | Toggle Edit/Preview |
-| Ctrl+Shift+T | Toggle Dark/Light theme |
-| Ctrl+Shift+E | Toggle sidebar |
-| Ctrl+Enter | AI completion |
-| Tab | Accept suggestion |
-| Esc | Dismiss suggestion |
-| Ctrl+B | Bold |
-| Ctrl+I | Italic |
-| Ctrl+Shift+K | Insert link |
-| Ctrl+, | Settings |
+---
 
 ## Installation
 
@@ -66,6 +64,33 @@ npm install
 npx tauri build
 ```
 
+---
+
+## Usage
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+O | Open workspace |
+| Ctrl+S | Save file |
+| Ctrl+W | Close tab |
+| Ctrl+K | Command palette |
+| Ctrl+Shift+F | Search workspace |
+| Ctrl+\\ | Cycle view mode (Edit → Split → Preview) |
+| Ctrl+Shift+P | Toggle Edit/Preview |
+| Ctrl+Shift+T | Toggle Dark/Light theme |
+| Ctrl+Shift+E | Toggle sidebar |
+| Ctrl+Enter | AI completion |
+| Tab | Accept suggestion |
+| Esc | Dismiss suggestion |
+| Ctrl+B | Bold |
+| Ctrl+I | Italic |
+| Ctrl+Shift+K | Insert link |
+| Ctrl+, | Settings |
+
+---
+
 ## AI Completion Setup
 
 Open Settings (Ctrl+,) to configure your AI provider:
@@ -79,6 +104,8 @@ Open Settings (Ctrl+,) to configure your AI provider:
 | Custom | Optional | User-defined |
 
 API keys are stored securely in your OS keychain.
+
+---
 
 ## Configuration
 
@@ -94,6 +121,8 @@ model = ""
 auto_completion = false
 ```
 
+---
+
 ## Tech Stack
 
 - **Shell:** [Tauri v2](https://tauri.app) (native, ~5MB overhead)
@@ -103,6 +132,20 @@ auto_completion = false
 - **Highlighting:** [syntect](https://github.com/trishume/syntect) (code block syntax colors)
 - **Security:** [ammonia](https://github.com/rust-ammonia/ammonia) (HTML sanitization)
 
+---
+
+## Contributing
+
+Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Build with `npx tauri build` to verify
+4. Commit your changes
+5. Push to the branch and open a Pull Request
+
+---
+
 ## License
 
-MIT
+[Apache-2.0](./LICENSE)
