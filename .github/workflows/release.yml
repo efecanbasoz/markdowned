@@ -24,6 +24,10 @@ jobs:
             args: ''
 
     runs-on: ${{ matrix.platform }}
+    env:
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY != '' && 'true' || 'false' }}
+      HAS_APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 != '' && 'true' || 'false' }}
+      HAS_APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY != '' && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +56,7 @@ jobs:
         run: npm ci
 
       - name: Prepare App Store Connect API key
-        if: startsWith(matrix.platform, 'macos') && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_P8 != ''
+        if: startsWith(matrix.platform, 'macos') && env.HAS_APPLE_API_KEY == 'true' && env.HAS_APPLE_API_KEY_P8 == 'true'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -64,7 +68,7 @@ jobs:
           echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
 
       - name: Warn when macOS release is not fully signed
-        if: startsWith(matrix.platform, 'macos') && secrets.APPLE_SIGNING_IDENTITY == ''
+        if: startsWith(matrix.platform, 'macos') && env.HAS_APPLE_SIGNING_IDENTITY != 'true'
         run: echo "::warning::Building macOS release with ad hoc signing. Configure Apple signing and notarization secrets for a fully trusted app."
 
       - uses: tauri-apps/tauri-action@v0

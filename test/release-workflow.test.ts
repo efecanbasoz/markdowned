@@ -26,4 +26,8 @@ describe("release workflow", () => {
     expect(workflow).toContain("APPLE_API_KEY_P8");
     expect(workflow).toContain("APPLE_API_KEY_PATH");
   });
+
+  it("does not reference secrets directly inside step conditions", () => {
+    expect(workflow).not.toMatch(/if:\s.*secrets\./);
+  });
 });
