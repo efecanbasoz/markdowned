@@ -10,7 +10,11 @@
   } from "$lib/editor/ghost-text";
   import { requestCompletion } from "$lib/commands/completion";
   import { loadConfig } from "$lib/commands/config";
-  import { mapScrollToTarget, type ScrollMetrics } from "$lib/utils/scroll-sync";
+  import {
+    createPendingScrollSync,
+    mapScrollToTarget,
+    type ScrollMetrics,
+  } from "$lib/utils/scroll-sync";
 
   let { onScrollChange = undefined }: {
     onScrollChange?: (metrics: ScrollMetrics) => void;
@@ -20,7 +24,7 @@
   let view: EditorView | null = null;
   let autoCompletionEnabled = false;
   let autoCompletionTimer: ReturnType<typeof setTimeout> | null = null;
-  let pendingSyncedScrollTop: number | null = null;
+  const pendingScrollSync = createPendingScrollSync();
 
   export function setContent(content: string) {
     if (!view) return;
@@ -46,17 +50,6 @@
     }
   }
 
-  function clearPendingSyncIfMatched(currentScrollTop: number) {
-    if (
-      pendingSyncedScrollTop !== null &&
-      Math.abs(currentScrollTop - pendingSyncedScrollTop) < 1
-    ) {
-      pendingSyncedScrollTop = null;
-      return true;
-    }
-    return false;
-  }
-
   export function syncScroll(metrics: ScrollMetrics) {
     if (!view) return;
     const targetScrollTop = mapScrollToTarget(
@@ -65,14 +58,8 @@
       view.scrollDOM.clientHeight,
     );
 
-    pendingSyncedScrollTop = targetScrollTop;
+    pendingScrollSync.mark(targetScrollTop);
     view.scrollDOM.scrollTop = targetScrollTop;
-
-    requestAnimationFrame(() => {
-      if (view) {
-        clearPendingSyncIfMatched(view.scrollDOM.scrollTop);
-      }
-    });
   }
 
   export function restoreState(cursorPos: number, scrollTop: number) {
@@ -151,7 +138,7 @@
     view = new EditorView({ state, parent: container });
     const handleScroll = () => {
       if (!view) return;
-      if (clearPendingSyncIfMatched(view.scrollDOM.scrollTop)) return;
+      if (pendingScrollSync.shouldIgnore(view.scrollDOM.scrollTop)) return;
       emitScrollChange();
     };
     view.scrollDOM.addEventListener("scroll", handleScroll, { passive: true });

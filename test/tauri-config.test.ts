@@ -21,4 +21,17 @@ describe("tauri desktop security config", () => {
     expect(csp).toContain("http://ipc.localhost");
     expect(csp).toContain("https://ipc.localhost");
   });
+
+  it("configures a fallback macOS signing identity", () => {
+    const configPath = resolve(process.cwd(), "src-tauri/tauri.conf.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+      bundle?: {
+        macOS?: {
+          signingIdentity?: string;
+        };
+      };
+    };
+
+    expect(config.bundle?.macOS?.signingIdentity).toBe("-");
+  });
 });

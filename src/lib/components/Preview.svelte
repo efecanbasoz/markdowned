@@ -2,14 +2,14 @@
   import { onMount } from "svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import type { ScrollMetrics } from "$lib/utils/scroll-sync";
-  import { mapScrollToTarget } from "$lib/utils/scroll-sync";
+  import { createPendingScrollSync, mapScrollToTarget } from "$lib/utils/scroll-sync";
 
   let { onScrollChange = undefined }: {
     onScrollChange?: (metrics: ScrollMetrics) => void;
   } = $props();
 
   let previewContainer = $state<HTMLDivElement | null>(null);
-  let pendingSyncedScrollTop: number | null = null;
+  const pendingScrollSync = createPendingScrollSync();
 
   export function getScrollMetrics(): ScrollMetrics | null {
     if (!previewContainer) return null;
@@ -24,17 +24,6 @@
     }
   }
 
-  function clearPendingSyncIfMatched(currentScrollTop: number) {
-    if (
-      pendingSyncedScrollTop !== null &&
-      Math.abs(currentScrollTop - pendingSyncedScrollTop) < 1
-    ) {
-      pendingSyncedScrollTop = null;
-      return true;
-    }
-    return false;
-  }
-
   export function syncScroll(metrics: ScrollMetrics) {
     if (!previewContainer) return;
     const targetScrollTop = mapScrollToTarget(
@@ -43,20 +32,14 @@
       previewContainer.clientHeight,
     );
 
-    pendingSyncedScrollTop = targetScrollTop;
+    pendingScrollSync.mark(targetScrollTop);
     previewContainer.scrollTop = targetScrollTop;
-
-    requestAnimationFrame(() => {
-      if (previewContainer) {
-        clearPendingSyncIfMatched(previewContainer.scrollTop);
-      }
-    });
   }
 
   onMount(() => {
     const handleScroll = () => {
       if (!previewContainer) return;
-      if (clearPendingSyncIfMatched(previewContainer.scrollTop)) return;
+      if (pendingScrollSync.shouldIgnore(previewContainer.scrollTop)) return;
       emitScrollChange();
     };
 

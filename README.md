@@ -6,7 +6,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)]()
-[![Version](https://img.shields.io/badge/version-1.7.0-2ea043?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-1.7.1-2ea043?style=flat-square)](package.json)
 
 Built with [Tauri](https://tauri.app), [Svelte 5](https://svelte.dev), and [CodeMirror 6](https://codemirror.net). No Electron, no bloat.
 
@@ -64,6 +64,20 @@ cd markdowned
 npm install
 npx tauri build
 ```
+
+### Maintainer Release Notes
+
+The GitHub release workflow can build macOS bundles with ad hoc signing by default, but proper public macOS distribution should provide Apple signing and notarization secrets:
+
+- `APPLE_CERTIFICATE`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_ID`
+- `APPLE_PASSWORD`
+- `APPLE_TEAM_ID`
+- `APPLE_API_KEY`
+- `APPLE_API_KEY_P8`
+- `APPLE_API_ISSUER`
 
 ---
 
